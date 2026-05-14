@@ -1,0 +1,19 @@
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# Local logs and captures
+*.log
+*.mp4
+*.mkv
+*.avi
+
+# PowerShell cache/output
+*.ps1xml
