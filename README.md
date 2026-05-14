@@ -1,4 +1,4 @@
-# Valorant NVIDIA 录屏监控
+# Valorant NVIDIA 自动录屏
 
 一个 Windows 托盘小工具：检测到 Valorant 启动后，自动通过 NVIDIA Overlay 的 `Alt + F9` 快捷键开启连续录制；检测到 Valorant 关闭后，自动停止录制并保存。
 
