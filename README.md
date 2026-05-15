@@ -11,6 +11,8 @@
 - Valorant 关闭后自动停止 NVIDIA 录制。
 - 只停止由本工具自动开启的录制，避免误停你手动开启的录制。
 - 读取 NVIDIA ShadowPlay 的 `CaptureCore.log`，尽量显示真实录屏状态。
+- 缓存最后一次可信状态，避免日志读取慢或短暂识别失败时窗口乱跳。
+- 需要连续约 10 秒确认“未检测到游戏/未录屏”后，才会把窗口降级为未检测或未启用。
 - 状态窗口会显示：
   - `未检测到游戏`：Valorant 未运行。
   - `正在游戏中`：Valorant 正在运行。
@@ -90,6 +92,13 @@ Uninstall-StartupTask.bat
 ```text
 C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 ```
+6. 工具会把最后一次可信状态缓存到：
+
+```text
+%LOCALAPPDATA%\ValorantRecordingMonitor\state.json
+```
+
+如果某一次检测暂时失败，窗口会先显示缓存状态，下一轮再继续刷新。
 
 ## 注意事项
 
@@ -98,6 +107,7 @@ C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 - 工具管理录制时，尽量不要手动按 `Alt + F9`。
 - NVIDIA 没有提供稳定公开的录制状态 API，所以本工具通过本地 NVIDIA 日志推断录屏状态。
 - 如果 NVIDIA 以后改变日志格式，状态显示可能会退回到工具内部记录。
+- 本地缓存只用于窗口显示，不用于决定是否自动停止录制。
 
 ## 文件说明
 
@@ -124,6 +134,8 @@ The status window shows whether Valorant is detected and whether NVIDIA recordin
 - Stops NVIDIA recording automatically after Valorant closes.
 - Stops recording only when this tool started it.
 - Reads NVIDIA ShadowPlay `CaptureCore.log` to infer recording status when available.
+- Caches the last reliable status so the UI does not flicker when a single check is slow or inconclusive.
+- Downgrades to "not detected" or "not recording" only after about 10 seconds of repeated confirmation.
 - Shows a compact status window:
   - `未检测到游戏`: Valorant is not running.
   - `正在游戏中`: Valorant is running.
@@ -201,6 +213,13 @@ Uninstall-StartupTask.bat
 ```text
 C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 ```
+6. It caches the last reliable status at:
+
+```text
+%LOCALAPPDATA%\ValorantRecordingMonitor\state.json
+```
+
+If one detection pass is inconclusive, the window keeps showing the cached status while the next refresh runs.
 
 ## Notes
 
@@ -209,3 +228,4 @@ C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 - Avoid manually pressing `Alt + F9` while the monitor is managing a recording.
 - NVIDIA does not provide a stable public recording-state API for this script, so recording state is inferred from local NVIDIA logs.
 - If NVIDIA changes the log format, the monitor may fall back to its internal state.
+- The local cache is for display only. It is not used to decide whether recording should be stopped.

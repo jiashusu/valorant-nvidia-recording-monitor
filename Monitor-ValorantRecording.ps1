@@ -21,8 +21,11 @@ if (-not $createdNew) {
 
 $checkIntervalSeconds = 5
 $recordingStartDelaySeconds = 3
+$debounceConfirmations = 2
 $recordToggleKeys = @(0x12, 0x78)
 $nvidiaCaptureLogPath = "C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log"
+$stateCacheDirectory = Join-Path $env:LOCALAPPDATA "ValorantRecordingMonitor"
+$stateCachePath = Join-Path $stateCacheDirectory "state.json"
 $valorantProcessNames = @(
     "VALORANT-Win64-Shipping",
     "VALORANT"
@@ -36,6 +39,97 @@ function New-Text {
     param([int[]]$CodePoints)
 
     return -join ($CodePoints | ForEach-Object { [char]$_ })
+}
+
+function Get-GameStatusForCache {
+    param([string]$Status)
+
+    if ($Status -eq "Idle" -or $Status -eq "Stopped") {
+        return "NotRunning"
+    }
+    if ($Status -eq "NoOverlay" -or $Status -eq "Game" -or $Status -eq "NotRecording" -or $Status -eq "Recording" -or $Status -eq "AudioWarning" -or $Status -eq "AudioUnknown" -or $Status -eq "Preparing") {
+        return "Running"
+    }
+
+    return "Unknown"
+}
+
+function Get-RecordingStatusForCache {
+    param([string]$Status)
+
+    if ($Status -eq "Recording" -or $Status -eq "AudioWarning" -or $Status -eq "AudioUnknown") {
+        return "Recording"
+    }
+    if ($Status -eq "NotRecording" -or $Status -eq "Idle" -or $Status -eq "Stopped") {
+        return "NotRecording"
+    }
+
+    return "Unknown"
+}
+
+function Read-StateCache {
+    if (-not (Test-Path $stateCachePath)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -Path $stateCachePath -Raw -ErrorAction Stop | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Save-StateCache {
+    param([string]$Status)
+
+    try {
+        if (-not (Test-Path $stateCacheDirectory)) {
+            New-Item -ItemType Directory -Path $stateCacheDirectory -Force | Out-Null
+        }
+
+        [PSCustomObject]@{
+            GameStatus = Get-GameStatusForCache -Status $Status
+            RecordingStatus = Get-RecordingStatusForCache -Status $Status
+            LastReliableStatus = $Status
+            UpdatedAt = (Get-Date).ToString("o")
+        } | ConvertTo-Json | Set-Content -Path $stateCachePath -Encoding UTF8
+    }
+    catch {
+    }
+}
+
+function Get-CachedDisplayStatus {
+    $cache = Read-StateCache
+    if (-not $cache) {
+        return $null
+    }
+
+    $validStatuses = @("Idle", "Game", "Preparing", "Recording", "NotRecording", "Stopped", "NoOverlay", "AudioWarning", "AudioUnknown")
+    if ($validStatuses -contains $cache.LastReliableStatus) {
+        return [string]$cache.LastReliableStatus
+    }
+
+    if ($cache.GameStatus -eq "Running" -and $cache.RecordingStatus -eq "Recording") {
+        return "Recording"
+    }
+    if ($cache.GameStatus -eq "Running" -and $cache.RecordingStatus -eq "NotRecording") {
+        return "NotRecording"
+    }
+    if ($cache.GameStatus -eq "Running") {
+        return "Game"
+    }
+    if ($cache.GameStatus -eq "NotRunning") {
+        return "Idle"
+    }
+
+    return $null
+}
+
+function Test-RecordingStatus {
+    param([string]$Status)
+
+    return ($Status -eq "Recording" -or $Status -eq "AudioWarning" -or $Status -eq "AudioUnknown")
 }
 
 function Test-ValorantRunning {
@@ -137,7 +231,7 @@ function Get-NvidiaAudioState {
     return "Ok"
 }
 
-function Get-DisplayStatus {
+function Get-RawDisplayStatus {
     param([bool]$IsRunning)
 
     if (-not $IsRunning) {
@@ -169,6 +263,51 @@ function Get-DisplayStatus {
     }
 
     return "Game"
+}
+
+function Get-DisplayStatus {
+    param([bool]$IsRunning)
+
+    $rawStatus = Get-RawDisplayStatus -IsRunning $IsRunning
+
+    if (-not $IsRunning) {
+        $script:gameMissingCount++
+        $script:recordingNotDetectedCount = 0
+
+        if ($script:gameMissingCount -lt $debounceConfirmations -and $script:lastReliableStatus) {
+            return $script:lastReliableStatus
+        }
+
+        $script:lastReliableStatus = "Idle"
+        return "Idle"
+    }
+
+    $script:gameMissingCount = 0
+
+    if (Test-RecordingStatus -Status $rawStatus) {
+        $script:recordingNotDetectedCount = 0
+        $script:lastReliableStatus = $rawStatus
+        return $rawStatus
+    }
+
+    if ($rawStatus -eq "NotRecording") {
+        $script:recordingNotDetectedCount++
+        if ($script:recordingNotDetectedCount -lt $debounceConfirmations -and (Test-RecordingStatus -Status $script:lastReliableStatus)) {
+            return $script:lastReliableStatus
+        }
+
+        $script:lastReliableStatus = "NotRecording"
+        return "NotRecording"
+    }
+
+    $script:recordingNotDetectedCount = 0
+
+    if ($rawStatus -eq "Game" -and (Test-RecordingStatus -Status $script:lastReliableStatus)) {
+        return $script:lastReliableStatus
+    }
+
+    $script:lastReliableStatus = $rawStatus
+    return $rawStatus
 }
 
 function Update-StatusDisplay {
@@ -264,6 +403,7 @@ function Update-StatusDisplay {
     $script:recordingLabel.Text = $recordingText
     $script:detailLabel.Text = $detailText
     $script:statusItem.Text = $statusText
+    Save-StateCache -Status $Status
 }
 
 function Start-AutomaticRecording {
@@ -370,6 +510,9 @@ $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = $checkIntervalSeconds * 1000
 $lastRunningState = $null
 $recordingStartedByTool = $false
+$gameMissingCount = 0
+$recordingNotDetectedCount = 0
+$lastReliableStatus = Get-CachedDisplayStatus
 
 $timer.Add_Tick({
     $isRunning = Test-ValorantRunning
@@ -429,6 +572,12 @@ $trayIcon.Add_DoubleClick({
     $script:form.Activate()
     $script:showWindowItem.Text = New-Text @(0x9690,0x85CF,0x72B6,0x6001,0x7A97,0x53E3)
 })
+
+$cachedStatus = Get-CachedDisplayStatus
+if ($cachedStatus) {
+    $lastReliableStatus = $cachedStatus
+    Update-StatusDisplay -Status $cachedStatus
+}
 
 $initialRunningState = Test-ValorantRunning
 $lastRunningState = $initialRunningState
