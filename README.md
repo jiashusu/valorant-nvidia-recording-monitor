@@ -2,7 +2,7 @@
 
 一个 Windows 托盘小工具：检测到 Valorant 启动后，自动通过 NVIDIA Overlay 的 `Alt + F9` 快捷键开启连续录制；检测到 Valorant 关闭后，自动停止录制并保存。
 
-窗口会显示当前是否检测到游戏，以及 NVIDIA 录屏是否启用。
+> 当前版本不包含开机自启动功能。需要使用时请手动启动。
 
 ## 功能
 
@@ -12,16 +12,8 @@
 - 只停止由本工具自动开启的录制，避免误停你手动开启的录制。
 - 读取 NVIDIA ShadowPlay 的 `CaptureCore.log`，尽量显示真实录屏状态。
 - 缓存最后一次可信状态，避免日志读取慢或短暂识别失败时窗口乱跳。
-- 需要连续约 10 秒确认“未检测到游戏/未录屏”后，才会把窗口降级为未检测或未启用。
-- 状态窗口会显示：
-  - `未检测到游戏`：Valorant 未运行。
-  - `正在游戏中`：Valorant 正在运行。
-  - `录屏：已启用`：NVIDIA 录屏看起来已开启。
-  - `录屏：未启用`：NVIDIA 录屏看起来未开启。
-  - `NVIDIA Overlay not running`：未检测到 NVIDIA Overlay。
-- 支持系统托盘运行。
-- 防止重复启动多个实例。
-- 支持开机登录后自动启动。
+- 连续约 10 秒确认未检测到游戏/未录屏后，才会把窗口降级为未检测或未启用。
+- 支持系统托盘运行，防止重复启动多个实例。
 
 ## 使用要求
 
@@ -59,27 +51,15 @@ Start-Monitor.bat
 Stop-Monitor.bat
 ```
 
-## 设置开机自启动
+## 状态窗口
 
-双击：
+- `未检测到游戏`：Valorant 未运行。
+- `正在游戏中`：Valorant 正在运行。
+- `录屏：已启用`：NVIDIA 录屏看起来已开启。
+- `录屏：未启用`：NVIDIA 录屏看起来未开启。
+- `NVIDIA Overlay not running`：未检测到 NVIDIA Overlay。
 
-```text
-Install-StartupTask.bat
-```
-
-它会创建一个 Windows 计划任务：
-
-```text
-Valorant NVIDIA Recording Monitor
-```
-
-之后每次登录 Windows，工具会自动启动。
-
-如果想取消开机自启动，双击：
-
-```text
-Uninstall-StartupTask.bat
-```
+关闭状态窗口只会隐藏窗口，程序仍会在系统托盘运行。双击托盘图标可以重新显示窗口，右键托盘图标可以退出。
 
 ## 工作方式
 
@@ -92,13 +72,12 @@ Uninstall-StartupTask.bat
 ```text
 C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 ```
+
 6. 工具会把最后一次可信状态缓存到：
 
 ```text
 %LOCALAPPDATA%\ValorantRecordingMonitor\state.json
 ```
-
-如果某一次检测暂时失败，窗口会先显示缓存状态，下一轮再继续刷新。
 
 ## 注意事项
 
@@ -106,7 +85,6 @@ C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 - 如果工具启动时 Valorant 已经开着，工具不会自动开启录制，避免误关你已经手动开启的录制。
 - 工具管理录制时，尽量不要手动按 `Alt + F9`。
 - NVIDIA 没有提供稳定公开的录制状态 API，所以本工具通过本地 NVIDIA 日志推断录屏状态。
-- 如果 NVIDIA 以后改变日志格式，状态显示可能会退回到工具内部记录。
 - 本地缓存只用于窗口显示，不用于决定是否自动停止录制。
 
 ## 文件说明
@@ -116,8 +94,6 @@ C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 - `停止录屏提醒.bat`：中文停止文件。
 - `Start-Monitor.bat`：英文启动文件。
 - `Stop-Monitor.bat`：英文停止文件。
-- `Install-StartupTask.ps1`：安装开机自启动计划任务。
-- `Uninstall-StartupTask.ps1`：移除开机自启动计划任务。
 
 ---
 
@@ -125,7 +101,7 @@ C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 
 A small Windows tray tool that watches for Valorant and automatically toggles NVIDIA continuous recording with `Alt + F9`.
 
-The status window shows whether Valorant is detected and whether NVIDIA recording appears to be enabled.
+> This version does not include startup-on-login. Start it manually when needed.
 
 ## Features
 
@@ -135,16 +111,8 @@ The status window shows whether Valorant is detected and whether NVIDIA recordin
 - Stops recording only when this tool started it.
 - Reads NVIDIA ShadowPlay `CaptureCore.log` to infer recording status when available.
 - Caches the last reliable status so the UI does not flicker when a single check is slow or inconclusive.
-- Downgrades to "not detected" or "not recording" only after about 10 seconds of repeated confirmation.
-- Shows a compact status window:
-  - `未检测到游戏`: Valorant is not running.
-  - `正在游戏中`: Valorant is running.
-  - `录屏：已启用`: recording appears to be enabled.
-  - `录屏：未启用`: recording appears to be disabled.
-  - `NVIDIA Overlay not running`: NVIDIA Overlay was not detected.
-- Runs from the system tray.
-- Prevents duplicate instances.
-- Supports Windows logon startup.
+- Downgrades to not detected or not recording only after about 10 seconds of repeated confirmation.
+- Runs from the system tray and prevents duplicate instances.
 
 ## Requirements
 
@@ -182,25 +150,15 @@ or:
 Stop-Monitor.bat
 ```
 
-## Enable Startup on Login
+## Status Window
 
-Double-click:
+- `未检测到游戏`: Valorant is not running.
+- `正在游戏中`: Valorant is running.
+- `录屏：已启用`: recording appears to be enabled.
+- `录屏：未启用`: recording appears to be disabled.
+- `NVIDIA Overlay not running`: NVIDIA Overlay was not detected.
 
-```text
-Install-StartupTask.bat
-```
-
-This creates a Windows Scheduled Task named:
-
-```text
-Valorant NVIDIA Recording Monitor
-```
-
-To remove startup behavior, double-click:
-
-```text
-Uninstall-StartupTask.bat
-```
+Closing the status window only hides it. Double-click the tray icon to show it again, or right-click the tray icon to exit.
 
 ## How It Works
 
@@ -213,13 +171,12 @@ Uninstall-StartupTask.bat
 ```text
 C:\ProgramData\NVIDIA Corporation\ShadowPlay\CaptureCore.log
 ```
+
 6. It caches the last reliable status at:
 
 ```text
 %LOCALAPPDATA%\ValorantRecordingMonitor\state.json
 ```
-
-If one detection pass is inconclusive, the window keeps showing the cached status while the next refresh runs.
 
 ## Notes
 
@@ -227,5 +184,4 @@ If one detection pass is inconclusive, the window keeps showing the cached statu
 - If Valorant is already running when the monitor starts, it will not auto-start recording.
 - Avoid manually pressing `Alt + F9` while the monitor is managing a recording.
 - NVIDIA does not provide a stable public recording-state API for this script, so recording state is inferred from local NVIDIA logs.
-- If NVIDIA changes the log format, the monitor may fall back to its internal state.
 - The local cache is for display only. It is not used to decide whether recording should be stopped.
